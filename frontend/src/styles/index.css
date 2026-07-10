@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-page-bg: 9 11 16;
+  --color-surface: 15 18 25;
+  --color-surface-soft: 21 26 36;
+  --color-border: 42 51 67;
+  --color-text: 243 247 252;
+  --color-text-muted: 160 172 191;
+  --color-accent: 245 158 11;
+  --color-accent-muted: 45 212 191;
+  --gradient-strength: 0.16;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root:not(.dark) {
+  --color-page-bg: 250 248 245;
+  --color-surface: 255 255 255;
+  --color-surface-soft: 247 243 238;
+  --color-border: 203 195 182;
+  --color-text: 28 25 23;
+  --color-text-muted: 87 83 78;
+  --color-accent: 217 119 6;
+  --color-accent-muted: 13 148 136;
+  --gradient-strength: 0.07;
+  color-scheme: light;
+}
+
+html {
+  min-height: 100%;
+  background: rgb(var(--color-page-bg));
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgb(var(--color-accent) / 0.09), transparent 30%),
+    radial-gradient(circle at bottom right, rgb(var(--color-accent-muted) / 0.08), transparent 32%),
+    rgb(var(--color-page-bg));
+  color: rgb(var(--color-text));
+  font-family: 'Inter', ui-sans-serif, system-ui;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui;
+  letter-spacing: -0.01em;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgb(var(--color-accent) / 0.25);
+}
