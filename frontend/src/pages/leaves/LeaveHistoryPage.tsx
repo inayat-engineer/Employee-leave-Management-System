@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarRange, History, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -38,6 +39,9 @@ export function LeaveHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | LeaveStatus>('all');
   const [search, setSearch] = useState('');
   const [viewScope, setViewScope] = useState<'mine' | 'all'>('mine');
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
 
   const canViewAll = Boolean(user?.is_superuser);
 
@@ -76,6 +80,12 @@ export function LeaveHistoryPage() {
       isMounted = false;
     };
   }, [canViewAll, viewScope, user]);
+
+  useEffect(() => {
+    if (highlightId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightId, leaves]);
 
   const filteredLeaves = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -189,8 +199,13 @@ export function LeaveHistoryPage() {
                 filteredLeaves.map((leave) => {
                   const duration = calculateDuration(leave.start_date, leave.end_date);
                   const approver = leave.approver_id ? employeesById[leave.approver_id] : null;
+                  const isHighlighted = highlightId !== null && leave.id === Number(highlightId);
                   return (
-                    <tr key={leave.id} className="hover:bg-surface-soft/50">
+                    <tr
+                      key={leave.id}
+                      ref={isHighlighted ? highlightedRowRef : undefined}
+                      className={`hover:bg-surface-soft/50 ${isHighlighted ? 'bg-accent/10 ring-1 ring-inset ring-accent/40' : ''}`}
+                    >
                       {viewScope === 'all' ? (
                         <td className="px-4 py-4 text-sm text-text">
                           {employeesById[leave.employee_id]?.full_name ?? `Employee #${leave.employee_id}`}

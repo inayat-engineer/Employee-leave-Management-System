@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarRange, Check, ClipboardList, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -42,7 +43,13 @@ export function LeaveRequestsPage() {
   const [employeesById, setEmployeesById] = useState<Record<number, EmployeeRecord>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | LeaveStatus>('pending');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status');
+  const isValidStatus = (value: string | null): value is 'all' | LeaveStatus =>
+    value === 'all' || value === 'pending' || value === 'approved' || value === 'rejected';
+  const [statusFilter, setStatusFilter] = useState<'all' | LeaveStatus>(
+    isValidStatus(initialStatus) ? initialStatus : 'pending',
+  );
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
 
@@ -77,6 +84,18 @@ export function LeaveRequestsPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight');
+    if (!highlightId || leaves.length === 0) {
+      return;
+    }
+    const match = leaves.find((leave) => leave.id === Number(highlightId));
+    if (match) {
+      setSelectedLeave(match);
+      setStatusFilter(match.status);
+    }
+  }, [leaves, searchParams]);
 
   const filteredLeaves = useMemo(() => {
     if (statusFilter === 'all') return leaves;
@@ -126,7 +145,10 @@ export function LeaveRequestsPage() {
               <button
                 key={filterValue}
                 type="button"
-                onClick={() => setStatusFilter(filterValue)}
+                onClick={() => {
+                  setStatusFilter(filterValue);
+                  setSearchParams(filterValue === 'pending' ? {} : { status: filterValue });
+                }}
                 className={`rounded-full border px-4 py-2 text-xs font-medium capitalize transition ${
                   statusFilter === filterValue
                     ? 'border-accent bg-accent/15 text-accent'

@@ -1,17 +1,50 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: leave_mysql
+    container_name: leave_mysql_stack
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: leave_db
-      MYSQL_USER: leave_user
-      MYSQL_PASSWORD: leave_pass
-    ports:
-      - "3306:3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+  backend:
+    build:
+      context: ./backend
+    container_name: leave_backend_stack
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - internal
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: leave_nginx_stack
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - internal
+networks:
+  internal:
 volumes:
   mysql_data:

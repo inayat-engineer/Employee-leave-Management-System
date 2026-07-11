@@ -1,9 +1,8 @@
 import { Route, Routes } from 'react-router-dom';
-import { AppLayout } from '@/layouts/AppLayout';
 import { AuthProvider } from '@/context/AuthContext';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { ActivatePage } from '@/pages/auth/ActivatePage';
-import { HomePage } from '@/pages/placeholders/HomePage';
+import { RootRedirect } from './RootRedirect';
 import { NotFoundPage } from '@/pages/placeholders/NotFoundPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { AppShell } from '@/components/layout/AppShell';
@@ -20,9 +19,7 @@ export function AppRouter() {
   return (
     <AuthProvider>
       <Routes>
-        <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
-        </Route>
+        <Route path="/" element={<RootRedirect />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="activate/:token" element={<ActivatePage />} />
         <Route

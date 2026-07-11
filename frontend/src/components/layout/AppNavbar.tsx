@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bell, ChevronDown, LogOut, Menu, Search, MoonStar, Settings, SunMedium, UserCircle2, CheckCheck } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Search, MoonStar, Settings, SunMedium, UserCircle2, CheckCheck, Users, CalendarClock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
@@ -11,6 +11,7 @@ import {
   markAllNotificationsRead,
   type NotificationRecord,
 } from '@/services/notifications';
+import { runGlobalSearch, type SearchResults, type EmployeeSearchResult, type LeaveSearchResult } from '@/services/globalSearch';
 
 type AppNavbarProps = {
   onMenuClick: () => void;
@@ -40,6 +41,12 @@ export function AppNavbar({ onMenuClick }: AppNavbarProps) {
   const notificationRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResults>({ employees: [], leaves: [] });
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement | null>(null);
+
   const loadNotifications = useCallback(async () => {
     try {
       const data = await fetchNotifications();
@@ -57,6 +64,29 @@ export function AppNavbar({ onMenuClick }: AppNavbarProps) {
   }, [loadNotifications]);
 
   useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length === 0) {
+      setSearchResults({ employees: [], leaves: [] });
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await runGlobalSearch(trimmed, Boolean(user?.is_superuser));
+        setSearchResults(results);
+      } catch {
+        setSearchResults({ employees: [], leaves: [] });
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, user?.is_superuser]);
+
+  useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
       const target = event.target as Node;
 
@@ -66,6 +96,10 @@ export function AppNavbar({ onMenuClick }: AppNavbarProps) {
 
       if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setShowUserMenu(false);
+      }
+
+      if (searchRef.current && !searchRef.current.contains(target)) {
+        setShowSearchResults(false);
       }
     }
 
@@ -107,6 +141,29 @@ export function AppNavbar({ onMenuClick }: AppNavbarProps) {
     }
   }
 
+  function goToEmployee(result: EmployeeSearchResult) {
+    setShowSearchResults(false);
+    setSearchQuery('');
+    navigate(`/employees?highlight=${result.id}`);
+  }
+
+  function goToLeave(result: LeaveSearchResult) {
+    setShowSearchResults(false);
+    setSearchQuery('');
+    navigate(user?.is_superuser ? `/leave-requests?highlight=${result.id}` : `/leave-history?highlight=${result.id}`);
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    if (searchResults.employees.length > 0) {
+      goToEmployee(searchResults.employees[0]);
+    } else if (searchResults.leaves.length > 0) {
+      goToLeave(searchResults.leaves[0]);
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-surface/85 backdrop-blur-xl">
       <div className="flex items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
@@ -114,16 +171,77 @@ export function AppNavbar({ onMenuClick }: AppNavbarProps) {
           <Menu size={18} />
         </Button>
 
-        <div className="relative flex-1 max-w-2xl">
+        <div className="relative flex-1 max-w-2xl" ref={searchRef}>
           <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
           <input
             type="search"
-            placeholder="Search employees, leaves, approvals..."
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setShowSearchResults(true);
+            }}
+            onFocus={() => setShowSearchResults(true)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder={user?.is_superuser ? 'Search employees, leaves, approvals...' : 'Search your leave requests...'}
             className={cn(
               'h-12 w-full rounded-2xl border border-border bg-surface-soft/80 pl-11 pr-4 text-sm text-text outline-none transition',
               'placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20',
             )}
           />
+
+          {showSearchResults && searchQuery.trim().length > 0 ? (
+            <div className="absolute left-0 right-0 mt-3 max-h-96 overflow-y-auto rounded-2xl border border-border bg-surface p-2 shadow-2xl shadow-black/30">
+              {isSearching ? (
+                <p className="px-3 py-6 text-center text-sm text-text-muted">Searching...</p>
+              ) : searchResults.employees.length === 0 && searchResults.leaves.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-text-muted">No results found.</p>
+              ) : (
+                <>
+                  {searchResults.employees.length > 0 ? (
+                    <div className="mb-1">
+                      <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Employees</p>
+                      {searchResults.employees.map((result) => (
+                        <button
+                          key={`employee-${result.id}`}
+                          type="button"
+                          onClick={() => goToEmployee(result)}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-surface-soft"
+                        >
+                          <Users size={16} className="shrink-0 text-text-muted" />
+                          <div>
+                            <p className="text-sm font-medium text-text">{result.title}</p>
+                            <p className="text-xs text-text-muted">{result.subtitle}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {searchResults.leaves.length > 0 ? (
+                    <div>
+                      <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                        {user?.is_superuser ? 'Leave requests' : 'My leaves'}
+                      </p>
+                      {searchResults.leaves.map((result) => (
+                        <button
+                          key={`leave-${result.id}`}
+                          type="button"
+                          onClick={() => goToLeave(result)}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-surface-soft"
+                        >
+                          <CalendarClock size={16} className="shrink-0 text-text-muted" />
+                          <div>
+                            <p className="text-sm font-medium text-text">{result.title}</p>
+                            <p className="truncate text-xs text-text-muted">{result.subtitle}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">

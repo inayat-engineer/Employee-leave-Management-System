@@ -1,4 +1,4 @@
-import { Bell, Moon, Palette, Sun } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Moon, Palette, Sun } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -55,20 +55,46 @@ export function SettingsPage() {
           <h3 className="text-lg font-semibold text-text">Notifications</h3>
         </div>
 
+        <p className="mt-2 text-xs text-text-muted">
+          These reflect what LeaveOps actually does today. Per-user notification preferences (muting
+          specific alerts, email digests) aren't built yet — everyone currently receives the same
+          in-app notifications shown below.
+        </p>
+
         <div className="mt-6 space-y-4">
           {[
-            { label: 'Leave request updates', description: 'Get notified when your leave requests are approved or rejected.' },
-            { label: 'Team leave alerts', description: 'Get notified when a teammate applies for leave.' },
-            { label: 'Weekly summary', description: 'Receive a weekly digest of leave activity.' },
+            {
+              label: 'Leave request updates',
+              description: 'You get an in-app notification when your leave request is approved or rejected.',
+              active: true,
+            },
+            {
+              label: 'Team leave alerts',
+              description: 'HR gets an in-app notification whenever an employee applies for leave.',
+              active: true,
+            },
+            {
+              label: 'Weekly summary',
+              description: 'A weekly digest of leave activity, delivered by email.',
+              active: false,
+            },
           ].map((item) => (
             <div key={item.label} className="flex items-center justify-between rounded-2xl border border-border bg-surface-soft/60 p-4">
               <div>
                 <p className="text-sm font-medium text-text">{item.label}</p>
                 <p className="text-xs text-text-muted">{item.description}</p>
               </div>
-              <span className="rounded-full border border-border bg-surface-soft px-3 py-1 text-xs text-text-muted">
-                Coming soon
-              </span>
+              {item.active ? (
+                <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
+                  <CheckCircle2 size={13} />
+                  Active
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 rounded-full border border-border bg-surface-soft px-3 py-1 text-xs text-text-muted">
+                  <Clock size={13} />
+                  Not yet built
+                </span>
+              )}
             </div>
           ))}
         </div>

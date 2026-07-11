@@ -18,3 +18,5 @@ frontend/.env
 
 # Docker
 *.log
+# Root-level env (Docker Compose credentials)
+.env
