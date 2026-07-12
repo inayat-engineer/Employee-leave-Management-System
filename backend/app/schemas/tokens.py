@@ -8,3 +8,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: str | None = None
+
+
+class AuthResponse(BaseModel):
+    detail: str = "Logged in successfully"

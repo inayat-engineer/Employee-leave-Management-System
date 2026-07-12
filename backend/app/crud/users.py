@@ -72,8 +72,7 @@ def create_user(db: Session, user: User) -> User:
 
 def update_user(db: Session, db_user: User, **updates) -> User:
     for key, value in updates.items():
-        if value is not None:
-            setattr(db_user, key, value)
+        setattr(db_user, key, value)
     db.commit()
     db.refresh(db_user)
     return db_user

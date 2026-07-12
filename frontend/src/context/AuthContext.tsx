@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '@/services/api';
-import { clearAuthToken, getAuthToken, setAuthToken } from '@/services/tokenStorage';
 
 export type AuthUser = {
   id: number;
@@ -27,57 +26,45 @@ type AcceptInvitePayload = {
   password: string;
 };
 
+type ResetPasswordPayload = {
+  token: string;
+  password: string;
+};
+
 type AuthContextValue = {
   user: AuthUser | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<AuthUser>;
   acceptInvite: (payload: AcceptInvitePayload) => Promise<AuthUser>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (payload: ResetPasswordPayload) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function normalizeUser(user: AuthUser): AuthUser {
-  return user;
-}
-
 async function fetchCurrentUser() {
   const response = await api.get<AuthUser>('/employees/me');
-  return normalizeUser(response.data);
+  return response.data;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [token, setTokenState] = useState<string | null>(() => getAuthToken());
 
   useEffect(() => {
     let isMounted = true;
 
     async function restoreSession() {
-      const storedToken = getAuthToken();
-      if (!storedToken) {
-        if (isMounted) {
-          setTokenState(null);
-          setUser(null);
-          setIsLoading(false);
-        }
-        return;
-      }
-
       try {
         const currentUser = await fetchCurrentUser();
         if (isMounted) {
-          setTokenState(storedToken);
           setUser(currentUser);
         }
       } catch {
-        clearAuthToken();
         if (isMounted) {
-          setTokenState(null);
           setUser(null);
         }
       } finally {
@@ -94,21 +81,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function login({ email, password }: LoginPayload) {
+  async function login({ email, password, rememberMe }: LoginPayload) {
     const formData = new URLSearchParams();
     formData.set('username', email);
     formData.set('password', password);
+    if (rememberMe) {
+      formData.set('scope', 'remember_me');
+    }
 
-    const response = await api.post<{ access_token: string; token_type: string }>(
-      '/auth/login',
-      formData,
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      },
-    );
-
-    setAuthToken(response.data.access_token);
-    setTokenState(response.data.access_token);
+    await api.post('/auth/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
 
     const currentUser = await fetchCurrentUser();
     setUser(currentUser);
@@ -116,13 +99,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function acceptInvite({ token: inviteToken, password }: AcceptInvitePayload) {
-    const response = await api.post<{ access_token: string; token_type: string }>('/auth/accept-invite', {
+    await api.post('/auth/accept-invite', {
       token: inviteToken,
       password,
     });
 
-    setAuthToken(response.data.access_token);
-    setTokenState(response.data.access_token);
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
+    return currentUser;
+  }
+
+  async function forgotPassword(email: string) {
+    await api.post('/auth/forgot-password', { email });
+  }
+
+  async function resetPassword({ token: resetToken, password }: ResetPasswordPayload) {
+    await api.post('/auth/reset-password', {
+      token: resetToken,
+      password,
+    });
 
     const currentUser = await fetchCurrentUser();
     setUser(currentUser);
@@ -133,28 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.post('/auth/logout');
     } finally {
-      clearAuthToken();
-      setTokenState(null);
       setUser(null);
     }
   }
 
   async function refreshUser() {
-    const storedToken = getAuthToken();
-    if (!storedToken) {
-      setTokenState(null);
-      setUser(null);
-      return null;
-    }
-
     try {
       const currentUser = await fetchCurrentUser();
-      setTokenState(storedToken);
       setUser(currentUser);
       return currentUser;
     } catch {
-      clearAuthToken();
-      setTokenState(null);
       setUser(null);
       return null;
     }
@@ -163,15 +146,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      token,
-      isAuthenticated: Boolean(user && token),
+      isAuthenticated: Boolean(user),
       isLoading,
       login,
       acceptInvite,
+      forgotPassword,
+      resetPassword,
       logout,
       refreshUser,
     }),
-    [isLoading, token, user],
+    [isLoading, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

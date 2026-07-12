@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthContext';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { ActivatePage } from '@/pages/auth/ActivatePage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { RootRedirect } from './RootRedirect';
 import { NotFoundPage } from '@/pages/placeholders/NotFoundPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
@@ -22,6 +24,8 @@ export function AppRouter() {
         <Route path="/" element={<RootRedirect />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="activate/:token" element={<ActivatePage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="reset-password/:token" element={<ResetPasswordPage />} />
         <Route
           element={
             <ProtectedRoute>

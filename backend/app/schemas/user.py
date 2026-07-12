@@ -76,3 +76,12 @@ class InviteDetails(BaseModel):
 class AcceptInvite(BaseModel):
     token: str
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPassword(BaseModel):
+    token: str
+    password: str

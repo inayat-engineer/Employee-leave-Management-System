@@ -159,13 +159,18 @@ def update_employee(
 def delete_employee(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_superuser),
 ):
     target_user = get_user(db, user_id)
     if target_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
-    _ensure_employee_access(current_user, target_user)
+    if current_user.id == target_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account.",
+        )
+
     delete_user(db, target_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

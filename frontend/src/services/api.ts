@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { clearAuthToken, getAuthToken } from './tokenStorage';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -9,29 +8,23 @@ if (!apiBaseUrl) {
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-api.interceptors.request.use((config) => {
-  const authToken = getAuthToken();
+const PUBLIC_AUTH_PATHS = ['/login', '/forgot-password', '/activate', '/reset-password'];
 
-  if (authToken) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${authToken}`;
-  }
-
-  return config;
-});
+function isPublicAuthPath(pathname: string): boolean {
+  return PUBLIC_AUTH_PATHS.some((path) => pathname.startsWith(path));
+}
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401) {
-      clearAuthToken();
-
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && !isPublicAuthPath(window.location.pathname)) {
         window.location.replace('/login');
       }
     }

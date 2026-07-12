@@ -88,11 +88,15 @@ export async function runGlobalSearch(query: string, isSuperuser: boolean): Prom
   }
 
   const normalized = trimmed.toLowerCase();
+  const matchesKnownType = findMatchingLeaveTypes(normalized).length > 0;
 
   if (isSuperuser) {
     const [employeesPage, allLeaves] = await Promise.all([
       fetchEmployees({ search: trimmed, limit: MAX_RESULTS_PER_CATEGORY }),
-      fetchAllLeaves(),
+      // If the query names a leave type (e.g. "sick"), fetch a broad, recent page and
+      // filter by exact type client-side. Otherwise let the backend do the real text
+      // search, so results aren't limited to whatever page happens to be fetched.
+      matchesKnownType ? fetchAllLeaves({}) : fetchAllLeaves({ search: trimmed }),
     ]);
 
     const matchingLeaves = filterLeavesByQuery(allLeaves, normalized)
@@ -105,7 +109,7 @@ export async function runGlobalSearch(query: string, isSuperuser: boolean): Prom
     };
   }
 
-  const myLeaves = await fetchMyLeaves();
+  const myLeaves = matchesKnownType ? await fetchMyLeaves({}) : await fetchMyLeaves({ search: trimmed });
   const matchingLeaves = filterLeavesByQuery(myLeaves, normalized)
     .slice(0, MAX_RESULTS_PER_CATEGORY)
     .map(leaveToResult);

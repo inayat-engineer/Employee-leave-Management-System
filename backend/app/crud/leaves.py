@@ -38,20 +38,48 @@ def get_leave(db: Session, leave_id: int) -> Leave | None:
     return db.query(Leave).filter(Leave.id == leave_id).first()
 
 
-def list_leaves(db: Session, skip: int = 0, limit: int = 100, status: LeaveStatus | None = None) -> list[Leave]:
+def list_leaves(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    status: LeaveStatus | None = None,
+    search: str | None = None,
+) -> list[Leave]:
     query = db.query(Leave)
     if status is not None:
         query = query.filter(Leave.status == status)
-    return query.offset(skip).limit(limit).all()
+    if search:
+        like_pattern = f"%{search}%"
+        query = query.filter(Leave.reason.ilike(like_pattern))
+    return query.order_by(Leave.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def list_leaves_for_user(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> list[Leave]:
+def list_leaves_for_user(
+    db: Session,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    search: str | None = None,
+) -> list[Leave]:
+    query = db.query(Leave).filter(Leave.employee_id == user_id)
+    if search:
+        like_pattern = f"%{search}%"
+        query = query.filter(Leave.reason.ilike(like_pattern))
+    return query.order_by(Leave.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def has_overlapping_leave(db: Session, employee_id: int, start_date, end_date) -> bool:
+    """Checks for any pending or approved leave that overlaps the given date range."""
     return (
         db.query(Leave)
-        .filter(Leave.employee_id == user_id)
-        .offset(skip)
-        .limit(limit)
-        .all()
+        .filter(
+            Leave.employee_id == employee_id,
+            Leave.status.in_([LeaveStatus.pending, LeaveStatus.approved]),
+            Leave.start_date <= end_date,
+            Leave.end_date >= start_date,
+        )
+        .first()
+        is not None
     )
 
 

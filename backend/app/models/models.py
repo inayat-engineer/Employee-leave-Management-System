@@ -41,6 +41,8 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     invite_token = Column(String(255), nullable=True, unique=True, index=True)
     invite_token_expires_at = Column(DateTime, nullable=True)
+    reset_token = Column(String(255), nullable=True, unique=True, index=True)
+    reset_token_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     leave_balance = relationship(
@@ -82,7 +84,7 @@ class Leave(Base):
     end_date = Column(Date, nullable=False)
     reason = Column(Text, nullable=False)
     status = Column(Enum(LeaveStatus), default=LeaveStatus.pending, nullable=False)
-    approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approver_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     employee = relationship("User", back_populates="leaves", foreign_keys=[employee_id])
@@ -103,7 +105,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     message = Column(String(255), nullable=False)
     link = Column(String(255), nullable=True)
     is_read = Column(Boolean, default=False, nullable=False)

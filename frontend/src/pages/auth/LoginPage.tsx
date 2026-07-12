@@ -160,7 +160,9 @@ export function LoginPage() {
               />
               Remember me
             </label>
-            <span className="text-sm text-text-muted">Contact HR for account access</span>
+            <Link to="/forgot-password" className="text-sm font-medium text-accent hover:underline">
+              Forgot password?
+            </Link>
           </div>
 
           {submitError ? (

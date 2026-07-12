@@ -20,7 +20,12 @@ class LeaveBase(BaseModel):
 
 
 class LeaveCreate(LeaveBase):
-    pass
+    @field_validator("start_date")
+    @classmethod
+    def start_date_not_in_past(cls, v):
+        if v < date.today():
+            raise ValueError("start_date cannot be in the past")
+        return v
 
 
 class LeaveUpdate(BaseModel):

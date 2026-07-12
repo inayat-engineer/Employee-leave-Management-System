@@ -11,6 +11,7 @@ from app.crud.leaves import (
     create_leave,
     delete_leave,
     get_leave,
+    has_overlapping_leave,
     list_leaves,
     list_leaves_for_user,
     reject_leave,
@@ -35,6 +36,12 @@ def apply_leave(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if has_overlapping_leave(db, current_user.id, leave_in.start_date, leave_in.end_date):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have a pending or approved leave request that overlaps these dates.",
+        )
+
     new_leave = Leave(
         employee_id=current_user.id,
         leave_type=leave_in.leave_type,
@@ -60,16 +67,20 @@ def read_all_leaves(
     db: Session = Depends(get_db),
     _: User = Depends(require_superuser),
     status_filter: LeaveStatus | None = Query(default=None, alias="status"),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
 ):
-    return list_leaves(db, status=status_filter)
+    return list_leaves(db, status=status_filter, search=search, limit=limit)
 
 
 @router.get("/me", response_model=list[LeaveResponse])
 def read_my_leaves(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
 ):
-    return list_leaves_for_user(db, current_user.id)
+    return list_leaves_for_user(db, current_user.id, search=search, limit=limit)
 
 
 @router.get("/{leave_id}", response_model=LeaveResponse)

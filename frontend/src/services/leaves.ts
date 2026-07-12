@@ -45,14 +45,21 @@ export async function applyLeave(payload: LeaveCreatePayload) {
   return response.data;
 }
 
-export async function fetchMyLeaves() {
-  const response = await api.get<LeaveRecord[]>('/leaves/me');
+export async function fetchMyLeaves(params: { search?: string } = {}) {
+  const response = await api.get<LeaveRecord[]>('/leaves/me', {
+    params: {
+      search: params.search || undefined,
+    },
+  });
   return response.data;
 }
 
-export async function fetchAllLeaves(status?: LeaveStatus) {
+export async function fetchAllLeaves(params: { status?: LeaveStatus; search?: string } = {}) {
   const response = await api.get<LeaveRecord[]>('/leaves/', {
-    params: status ? { status } : undefined,
+    params: {
+      status: params.status || undefined,
+      search: params.search || undefined,
+    },
   });
   return response.data;
 }
