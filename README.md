@@ -72,12 +72,36 @@ Built as a 3-week internship portfolio project. The goal was not just to make so
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, React Router v6, React Hook Form + Zod, Axios, Recharts |
-| Backend | FastAPI, SQLAlchemy, Pydantic v2, python-jose (JWT), passlib/bcrypt, slowapi (rate limiting) |
-| Database | MySQL 8.0 |
-| Deployment | Docker, Docker Compose, Nginx (reverse proxy + static file serving) |
+**Frontend**
+
+[![React](https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![React Router](https://img.shields.io/badge/React_Router_v6-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white)](https://reactrouter.com/)
+[![React Hook Form](https://img.shields.io/badge/React_Hook_Form-EC5990?style=for-the-badge&logo=reacthookform&logoColor=white)](https://react-hook-form.com/)
+[![Zod](https://img.shields.io/badge/Zod-3E67B1?style=for-the-badge&logo=zod&logoColor=white)](https://zod.dev/)
+[![Axios](https://img.shields.io/badge/Axios-5A29E4?style=for-the-badge&logo=axios&logoColor=white)](https://axios-http.com/)
+[![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=for-the-badge)](https://recharts.org/)
+
+**Backend**
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=for-the-badge&logo=python&logoColor=white)](https://www.sqlalchemy.org/)
+[![Pydantic v2](https://img.shields.io/badge/Pydantic_v2-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![python-jose](https://img.shields.io/badge/python--jose-JWT-black?style=for-the-badge)](https://github.com/mpdavis/python-jose)
+[![passlib](https://img.shields.io/badge/passlib-bcrypt-4B8BBE?style=for-the-badge&logo=python&logoColor=white)](https://passlib.readthedocs.io/)
+[![slowapi](https://img.shields.io/badge/slowapi-rate_limiting-F7931E?style=for-the-badge)](https://github.com/laurentS/slowapi)
+
+**Database**
+
+[![MySQL](https://img.shields.io/badge/MySQL_8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+
+**Deployment**
+
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)](https://nginx.org/)
 
 ---
 
@@ -118,6 +142,8 @@ This project went through a dedicated security audit, and the fixes were verifie
 - **IDOR & mass assignment**: every ownership-sensitive route was audited; self-edit endpoints use an explicit field allowlist so a user can never write to `is_active` or `is_superuser` on their own account
 - **Input validation**: `profile_picture_url` is validated as a real `http(s)://` URL server-side (not just client-side), and free-text fields like `reason` have server-enforced length limits
 - **Rate limiting**: login (5/min), invites (10/hr), leave applications (20/hr), and accept-invite (per-token, effectively unbrute-forceable given 32-byte random tokens) are all rate-limited via `slowapi`. Uvicorn runs with `--proxy-headers --forwarded-allow-ips=*` so the limiter reads the real client IP forwarded by Nginx, rather than seeing every request as coming from the same internal container address — a subtle bug that would otherwise make the whole rate-limiting story cosmetic in the Docker deployment
+- **CSRF**: no separate CSRF token is issued. Mitigated by two things together — the session cookie is `SameSite=Lax` (browsers won't attach it to cross-site POST/PUT/DELETE requests triggered by another site), and every state-changing route in this API is POST/PUT/DELETE, never GET, so a cross-site `<img>`/link-based attack has nothing to trigger. A dedicated CSRF token is on the roadmap for defense-in-depth, not because a concrete bypass is known today.
+- **Transport security**: the app currently runs over plain HTTP in the Docker Compose deployment shown below. This is a known, documented gap — see [Known limitations](#known-limitations).
 - **Debug/docs exposure**: `DEBUG` controls FastAPI's error verbosity; `ENABLE_DOCS` independently controls whether Swagger/ReDoc are exposed at all — the two are deliberately decoupled so docs can be hidden in a security-conscious deployment without also disabling proper error handling
 - **Database isolation**: MySQL is not exposed to the host in the Docker deployment — only reachable over the internal network by the backend container
 
@@ -283,6 +309,7 @@ Set `ENABLE_DOCS=False` before any real deployment where you don't want the full
 
 These are deliberate scope decisions for a 3-week project, not oversights:
 
+- **No HTTPS/TLS in the current deployment** — Nginx serves on port 80 only. A Let's Encrypt + Certbot setup (dummy-cert bootstrap, webroot HTTP-01 challenge, auto-renewal with a self-reloading Nginx container) has been designed and is ready to wire in — it requires a real domain name with DNS pointed at the deployment host, which this portfolio deployment doesn't have yet. **Do not deploy this publicly with real employee data until TLS is in place** — login credentials and session cookies would travel in plaintext.
 - No file upload backend — `profile_picture_url` is a validated URL string, not real image storage
 - No WebSocket-based real-time notifications — polling every 20 seconds instead, to avoid the added Nginx configuration complexity WebSockets require
 - No database migration tool (Alembic) — schema changes are applied manually via `Base.metadata.create_all()`
@@ -291,6 +318,8 @@ These are deliberate scope decisions for a 3-week project, not oversights:
 
 ## Roadmap ideas
 
+- Let's Encrypt + Certbot TLS termination in Nginx (design ready — see Known limitations)
+- Dedicated CSRF token for defense-in-depth, on top of the existing SameSite=Lax mitigation
 - Per-user notification preferences backed by a real schema field
 - Email digest / weekly summary notifications
 - File upload support for profile pictures
