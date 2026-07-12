@@ -78,3 +78,16 @@ export async function fetchLeaveBalance(userId: number) {
   const response = await api.get<LeaveBalanceRecord>(`/employees/${userId}/leave-balance`);
   return response.data;
 }
+
+export type EmployeeInvitePayload = {
+  full_name: string;
+  email: string;
+  department?: string | null;
+  designation?: string | null;
+  joining_date?: string | null;
+};
+
+export async function inviteEmployee(payload: EmployeeInvitePayload) {
+  const response = await api.post<EmployeeRecord>('/employees/invite', payload);
+  return response.data;
+}

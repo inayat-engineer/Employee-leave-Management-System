@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, PencilLine, Search, Trash2, Users, ChevronLeft, ChevronRight, RefreshCcw, X, Briefcase, Mail, Phone, CalendarDays } from 'lucide-react';
+import { Eye, PencilLine, Search, Trash2, Users, ChevronLeft, ChevronRight, RefreshCcw,UserPlus, X, Briefcase, Mail, Phone, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -8,6 +8,7 @@ import {
   fetchEmployees,
   updateEmployee,
   deleteEmployee,
+  inviteEmployee,
   fetchLeaveBalance,
   type EmployeeRecord,
   type LeaveBalanceRecord,
@@ -69,6 +70,8 @@ export function EmployeesPage() {
   const [deleteTarget, setDeleteTarget] = useState<EmployeeRecord | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,6 +138,28 @@ export function EmployeesPage() {
   async function handleRefresh() {
     await loadEmployees();
     toast.success('Employee list refreshed');
+  }
+
+  async function handleInvite(formData: FormData) {
+    setIsInviting(true);
+    try {
+      await inviteEmployee({
+        full_name: String(formData.get('full_name') ?? ''),
+        email: String(formData.get('email') ?? ''),
+        department: (formData.get('department') as string) || null,
+        designation: (formData.get('designation') as string) || null,
+        joining_date: (formData.get('joining_date') as string) || null,
+      });
+      toast.success('Invite sent — the employee will receive an activation email.');
+      setIsInviteOpen(false);
+      await handleRefresh();
+    } catch (error) {
+      toast.error(
+        (error as any)?.response?.data?.detail ?? 'Could not send the invite. Please try again.',
+      );
+    } finally {
+      setIsInviting(false);
+    }
   }
 
   async function handleView(employee: EmployeeRecord) {
@@ -204,10 +229,16 @@ export function EmployeesPage() {
             </p>
           </div>
 
-          <Button type="button" variant="secondary" className="gap-2 self-start lg:self-auto" onClick={handleRefresh} disabled={isLoading}>
-            <RefreshCcw size={16} className={isLoading ? 'animate-spin' : ''} />
-            Refresh
-          </Button>
+          <div className="flex flex-col gap-3 self-start sm:flex-row lg:self-auto">
+            <Button type="button" variant="primary" className="gap-2" onClick={() => setIsInviteOpen(true)}>
+              <UserPlus size={16} />
+              Invite Employee
+            </Button>
+            <Button type="button" variant="secondary" className="gap-2" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCcw size={16} className={isLoading ? 'animate-spin' : ''} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -578,6 +609,76 @@ export function EmployeesPage() {
               {isDeleting ? 'Deleting...' : 'Delete employee'}
             </Button>
           </div>
+        </Modal>
+      ) : null}
+
+      {isInviteOpen ? (
+        <Modal onClose={() => setIsInviteOpen(false)}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-text">Invite employee</h3>
+            <button type="button" onClick={() => setIsInviteOpen(false)} className="text-text-muted hover:text-text">
+              <X size={20} />
+            </button>
+          </div>
+
+          <form
+            className="mt-6 space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleInvite(new FormData(event.currentTarget));
+            }}
+          >
+            <label className="block">
+              <span className="text-sm font-medium text-text">Full name</span>
+              <input
+                name="full_name"
+                required
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-text">Email</span>
+              <input
+                name="email"
+                type="email"
+                required
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-text">Department</span>
+                <input
+                  name="department"
+                  className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-text">Designation</span>
+                <input
+                  name="designation"
+                  className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-sm font-medium text-text">Joining date</span>
+              <input
+                name="joining_date"
+                type="date"
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setIsInviteOpen(false)} disabled={isInviting}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={isInviting}>
+                {isInviting ? 'Sending invite...' : 'Send invite'}
+              </Button>
+            </div>
+          </form>
         </Modal>
       ) : null}
     </div>
