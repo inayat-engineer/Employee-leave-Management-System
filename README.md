@@ -27,18 +27,25 @@ Built as a 3-week internship portfolio project. The goal was not just to make so
 ## Features
 
 **Authentication & onboarding**
-- JWT-based login, no public self-registration — HR invites employees by email
+- JWT-based auth delivered via an `httpOnly`, `SameSite=Lax` cookie — never exposed to JavaScript, so a client-side XSS bug can't read or exfiltrate the session token the way it could with `localStorage`
+- No public self-registration — HR invites employees by email
 - Invite tokens are cryptographically random (`secrets.token_urlsafe(32)`), single-use, and expire automatically
 - Real invite emails sent via Gmail SMTP with an activation link → set password → auto-login flow
+- Full self-service password recovery: forgot-password request → real reset email → token-gated reset page → auto-login on success, using the same single-use, expiring token pattern as invites
+- "Remember me" genuinely changes server-issued token lifetime (30 days vs. the default short session), not just a cosmetic checkbox
+- Logout revokes the session cookie server-side (`delete_cookie`), not just a client-side "forget the token" instruction
 - Deactivated accounts are blocked at both login and on every subsequent authenticated request, not just at sign-in
 
 **Role-based access control**
 - Two roles: HR (superuser) and Employee, enforced server-side on every route — not just hidden in the UI
 - Field-level allowlisting on self-edit so an employee can never elevate their own permissions or reactivate a deactivated account
 - Every `{id}`-based route checks ownership or role before returning data
+- Only HR can delete an employee record — self-deletion is blocked, closing off what was previously a way for an employee to wipe their own leave/audit history
+- Foreign keys use explicit `ON DELETE` behavior (`SET NULL` for approver references, `CASCADE` for notifications) so deleting a user never crashes on an unhandled integrity error
 
 **Leave management**
 - Apply, approve, reject, and withdraw leave requests
+- Leave dates are validated server-side: no requests starting in the past, no overlapping requests against the same employee's existing pending/approved leave
 - Real balance tracking for casual, sick, and annual leave — deduction happens on **approval**, not on apply, so rejected requests never touch the balance
 - Approval is blocked with a clear error if it would overdraw the balance
 - Once HR has approved or rejected a request, it becomes immutable — an employee can only withdraw a request that's still pending, preserving the audit trail
@@ -110,7 +117,7 @@ This project went through a dedicated security audit, and the fixes were verifie
 - **Secrets**: JWT secret, SMTP credentials, and database passwords are all environment-driven, never hardcoded, and `.env` files are gitignored at every level (root, `backend/`, `frontend/`)
 - **IDOR & mass assignment**: every ownership-sensitive route was audited; self-edit endpoints use an explicit field allowlist so a user can never write to `is_active` or `is_superuser` on their own account
 - **Input validation**: `profile_picture_url` is validated as a real `http(s)://` URL server-side (not just client-side), and free-text fields like `reason` have server-enforced length limits
-- **Rate limiting**: login (5/min), invites (10/hr), and leave applications (20/hr) are all rate-limited per IP via `slowapi`
+- **Rate limiting**: login (5/min), invites (10/hr), leave applications (20/hr), and accept-invite (per-token, effectively unbrute-forceable given 32-byte random tokens) are all rate-limited via `slowapi`. Uvicorn runs with `--proxy-headers --forwarded-allow-ips=*` so the limiter reads the real client IP forwarded by Nginx, rather than seeing every request as coming from the same internal container address — a subtle bug that would otherwise make the whole rate-limiting story cosmetic in the Docker deployment
 - **Debug/docs exposure**: `DEBUG` controls FastAPI's error verbosity; `ENABLE_DOCS` independently controls whether Swagger/ReDoc are exposed at all — the two are deliberately decoupled so docs can be hidden in a security-conscious deployment without also disabling proper error handling
 - **Database isolation**: MySQL is not exposed to the host in the Docker deployment — only reachable over the internal network by the backend container
 
