@@ -14,7 +14,7 @@ export const api = axios.create({
   },
 });
 
-const PUBLIC_AUTH_PATHS = ['/login', '/forgot-password', '/activate', '/reset-password'];
+const PUBLIC_AUTH_PATHS = ['/login', '/forgot-password', '/activate', '/reset-password', '/verify-email-change'];
 
 function isPublicAuthPath(pathname: string): boolean {
   return PUBLIC_AUTH_PATHS.some((path) => pathname.startsWith(path));

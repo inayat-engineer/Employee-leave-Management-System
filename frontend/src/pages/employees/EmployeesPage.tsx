@@ -181,9 +181,13 @@ export function EmployeesPage() {
     if (!editTarget) return;
     setIsSavingEdit(true);
     try {
+      const isEditingSelf = editTarget.id === user?.id;
       await updateEmployee(editTarget.id, {
         full_name: String(formData.get('full_name') || ''),
-        email: String(formData.get('email') || ''),
+        // Self-edits never touch email here — see the disabled input below.
+        // The backend requires current_password + email verification for
+        // your own email change, which this bulk admin form doesn't collect.
+        ...(isEditingSelf ? {} : { email: String(formData.get('email') || '') }),
         department: String(formData.get('department') || '') || null,
         designation: String(formData.get('designation') || '') || null,
         phone_number: String(formData.get('phone_number') || '') || null,
@@ -532,12 +536,21 @@ export function EmployeesPage() {
             </label>
             <label className="block">
               <span className="text-sm font-medium text-text">Email</span>
-              <input
-                name="email"
-                type="email"
-                defaultValue={editTarget.email}
-                className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
+              <div className="relative mt-2">
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={editTarget.email}
+                  disabled={editTarget.id === user?.id}
+                  className="mt-2 h-11 w-full rounded-xl border border-border bg-surface-soft/80 px-4 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </div>
+              {editTarget.id === user?.id ? (
+                <p className="mt-1.5 text-xs text-text-muted">
+                  You can't change your own email from here — use Profile → Change email, which requires your
+                  password and a confirmation link.
+                </p>
+              ) : null}
             </label>
             <div className="grid grid-cols-2 gap-4">
               <label className="block">

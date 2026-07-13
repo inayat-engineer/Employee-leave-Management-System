@@ -52,10 +52,18 @@ export type EmployeeUpdatePayload = Partial<{
   phone_number: string | null;
   profile_picture_url: string | null;
   joining_date: string | null;
+  // Required by the backend whenever `email` or `password` is being
+  // changed on your OWN account — omit for admin edits of someone else.
+  current_password: string;
 }>;
 
 export async function updateEmployee(id: number, payload: EmployeeUpdatePayload) {
   const response = await api.put<EmployeeRecord>(`/employees/${id}`, payload);
+  return response.data;
+}
+
+export async function verifyEmailChange(token: string) {
+  const response = await api.post<{ detail: string }>(`/employees/verify-email-change/${token}`);
   return response.data;
 }
 
