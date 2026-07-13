@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.email import send_password_reset_email
 from app.core.limiter import limiter
-from app.core.security import generate_invite_token, get_password_hash, verify_password, create_access_token
+from app.core.security import generate_invite_token, get_password_hash, hash_token, verify_password, create_access_token
 from app.models.models import User
 from app.schemas.user import AcceptInvite, ForgotPasswordRequest, InviteDetails, ResetPassword
 from app.schemas.tokens import AuthResponse
@@ -53,7 +53,7 @@ def login(
     else:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    access_token = create_access_token(subject=user.email, expires_delta=expires_delta)
+    access_token = create_access_token(subject=user.email, token_version=user.token_version, expires_delta=expires_delta)
     _set_auth_cookie(response, access_token, max_age_seconds=int(expires_delta.total_seconds()))
     return AuthResponse(detail="Logged in successfully")
 
@@ -66,7 +66,7 @@ def logout(response: Response):
 
 @router.get("/invite/{token}", response_model=InviteDetails)
 def get_invite_details(token: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.invite_token == token).first()
+    user = db.query(User).filter(User.invite_token == hash_token(token)).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite link is invalid.")
 
@@ -82,7 +82,7 @@ def get_invite_details(token: str, db: Session = Depends(get_db)):
 @router.post("/accept-invite", response_model=AuthResponse)
 @limiter.limit("5/minute")
 def accept_invite(request: Request, payload: AcceptInvite, response: Response, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.invite_token == payload.token).first()
+    user = db.query(User).filter(User.invite_token == hash_token(payload.token)).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite link is invalid.")
 
@@ -102,7 +102,7 @@ def accept_invite(request: Request, payload: AcceptInvite, response: Response, d
     db.commit()
     db.refresh(user)
 
-    access_token = create_access_token(subject=user.email)
+    access_token = create_access_token(subject=user.email, token_version=user.token_version)
     _set_auth_cookie(response, access_token, max_age_seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     return AuthResponse(detail="Account activated successfully")
 
@@ -116,10 +116,12 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
         return generic_response
 
     token = generate_invite_token()
-    user.reset_token = token
+    user.reset_token = hash_token(token)
     user.reset_token_expires_at = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
     db.commit()
 
+    # The raw token only ever exists in the email link — the DB only ever
+    # holds its hash (see hash_token docstring).
     reset_link = f"{settings.FRONTEND_URL}/reset-password/{token}"
     send_password_reset_email(to_email=user.email, full_name=user.full_name, reset_link=reset_link)
 
@@ -129,7 +131,7 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
 @router.post("/reset-password", response_model=AuthResponse)
 @limiter.limit("5/minute")
 def reset_password(request: Request, payload: ResetPassword, response: Response, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.reset_token == payload.token).first()
+    user = db.query(User).filter(User.reset_token == hash_token(payload.token)).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reset link is invalid.")
 
@@ -142,9 +144,13 @@ def reset_password(request: Request, payload: ResetPassword, response: Response,
     user.hashed_password = get_password_hash(payload.password)
     user.reset_token = None
     user.reset_token_expires_at = None
+    # Invalidate every session/token issued before this reset — this is the
+    # whole point of a password reset (e.g. "I think someone else has my
+    # session"), and stateless JWTs don't get this for free otherwise.
+    user.token_version += 1
     db.commit()
     db.refresh(user)
 
-    access_token = create_access_token(subject=user.email)
+    access_token = create_access_token(subject=user.email, token_version=user.token_version)
     _set_auth_cookie(response, access_token, max_age_seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     return AuthResponse(detail="Password reset successfully")
