@@ -147,6 +147,13 @@ This project went through a dedicated security audit, and the fixes were verifie
 - **Debug/docs exposure**: `DEBUG` controls FastAPI's error verbosity; `ENABLE_DOCS` independently controls whether Swagger/ReDoc are exposed at all — the two are deliberately decoupled so docs can be hidden in a security-conscious deployment without also disabling proper error handling
 - **Database isolation**: MySQL is not exposed to the host in the Docker deployment — only reachable over the internal network by the backend container
 
+- **Token hashing**: invite and password-reset tokens are stored in the database as SHA-256 hashes, not raw values — even a full database leak wouldn't expose usable tokens, mirroring how passwords themselves are stored
+- **Session invalidation on password reset**: a `token_version` claim embedded in every JWT is checked against the user's current version on each request. Resetting a password bumps this version, which instantly invalidates every previously-issued token — including a stolen/leaked cookie — without needing a server-side token blocklist
+- **Step-up re-authentication**: changing your own password or email now requires re-entering your current password. This closes the "stolen cookie → permanent account takeover" gap that existed when session possession alone was enough to change either
+- **Two-step email verification**: changing your account email no longer takes effect immediately. A verification link is sent to the *new* address; the change only applies once that link is clicked, and the old email stays active in the meantime — preventing silent account takeover or accidental lockout
+- **Tightened CORS**: `allow_methods` and `allow_headers` are now explicit lists rather than `*`, reducing blast radius if `allow_origins` is ever accidentally loosened during debugging
+- **Bootstrap credential warning**: if `BOOTSTRAP_SUPERUSER_EMAIL`/`PASSWORD` are still set in the environment after the first superuser has been created, the backend logs a loud warning on every startup until they're removed
+
 ---
 
 ## Project structure
