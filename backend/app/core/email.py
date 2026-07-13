@@ -53,6 +53,54 @@ If you weren't expecting this, you can ignore this email.
         server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
         server.send_message(message)
 
+def send_email_change_verification(to_email: str, full_name: str, verify_link: str, expire_hours: int) -> None:
+    """Sent to the NEW address only. The old address keeps working until this is clicked."""
+    message = EmailMessage()
+    message["Subject"] = "Confirm your new LeaveOps email address"
+    message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+    message["To"] = to_email
+    message.set_content(
+        f"""Hi {full_name},
+
+We received a request to change the email address on your LeaveOps account to this address.
+
+Confirm the change here:
+{verify_link}
+
+This link expires in {expire_hours} hour(s).
+
+If you didn't request this, ignore this email and your account's email address will not change.
+
+- LeaveOps HR
+"""
+    )
+    message.add_alternative(
+        f"""\
+<html>
+  <body style="font-family: sans-serif; color: #1c1917; line-height: 1.6;">
+    <p>Hi {full_name},</p>
+    <p>We received a request to change the email address on your <strong>LeaveOps</strong> account to this address.</p>
+    <p>
+      <a href="{verify_link}"
+         style="display:inline-block; padding:12px 20px; background:#d97706; color:#ffffff;
+                border-radius:10px; text-decoration:none; font-weight:600;">
+        Confirm new email
+      </a>
+    </p>
+    <p style="color:#57534e; font-size:13px;">This link expires in {expire_hours} hour(s).</p>
+    <p style="color:#57534e; font-size:13px;">If you didn't request this, ignore this email and your account's email address will not change.</p>
+    <p>- LeaveOps HR</p>
+  </body>
+</html>
+""",
+        subtype="html",
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        server.starttls()
+        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        server.send_message(message)
+
+
 def send_password_reset_email(to_email: str, full_name: str, reset_link: str) -> None:
     message = EmailMessage()
     message["Subject"] = "Reset your LeaveOps password"

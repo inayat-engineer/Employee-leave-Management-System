@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
     RESET_TOKEN_EXPIRE_HOURS: int = 1
+    EMAIL_CHANGE_TOKEN_EXPIRE_HOURS: int = 24
 
     # Comma-separated list of allowed frontend origins for CORS.
     # e.g. "http://localhost:5173,https://leaveops.yourcompany.com"
