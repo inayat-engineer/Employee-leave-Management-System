@@ -24,6 +24,16 @@ def bootstrap_superuser() -> None:
     try:
         existing_user_count = db.query(User).count()
         if existing_user_count > 0:
+            # Bootstrap already happened at some point in the past — these
+            # env vars are now a live, unused, privileged credential sitting
+            # in plaintext config. Nag on every single startup until they're
+            # removed, rather than silently doing nothing.
+            logger.critical(
+                "BOOTSTRAP_SUPERUSER_EMAIL/PASSWORD are still set but the users table "
+                "is not empty — bootstrap already ran. Remove these two variables from "
+                "your environment now; leaving them in place is a standing credential "
+                "that grants superuser access to anyone who reads this config."
+            )
             return
 
         new_user = User(

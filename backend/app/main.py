@@ -31,8 +31,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Explicit lists instead of "*": currently safe either way because
+    # allow_origins is a concrete list (browsers won't honor credentialed
+    # wildcard-origin CORS), but explicit methods/headers keep it safe even
+    # if CORS_ORIGINS is ever loosened by mistake during debugging.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(auth_router)
