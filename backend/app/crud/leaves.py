@@ -38,6 +38,16 @@ def get_leave(db: Session, leave_id: int) -> Leave | None:
     return db.query(Leave).filter(Leave.id == leave_id).first()
 
 
+def user_has_any_leaves(db: Session, user_id: int) -> bool:
+    """
+    Used to guard employee deletion: an employee with ANY leave record
+    (pending, approved, or rejected) must not be hard-deleted, since that
+    would cascade-destroy the audit trail. HR should deactivate such
+    accounts instead (see delete_employee route).
+    """
+    return db.query(Leave.id).filter(Leave.employee_id == user_id).first() is not None
+
+
 def list_leaves(
     db: Session,
     skip: int = 0,

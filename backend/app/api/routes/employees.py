@@ -18,6 +18,7 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
+from app.crud.leaves import user_has_any_leaves
 from app.crud.users import (
     create_user,
     delete_user,
@@ -293,6 +294,23 @@ def delete_employee(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot delete your own account.",
+        )
+
+    # Hard-delete is only safe for an employee who has never applied for
+    # leave — anyone with leave history (pending, approved, or rejected)
+    # must be deactivated instead, otherwise we'd cascade-destroy the audit
+    # trail that approve/reject/withdraw are so careful to preserve
+    # elsewhere. Deactivating already fully revokes access: it's blocked at
+    # login (auth.py) and on every subsequent authenticated request
+    # (deps.py::get_current_user).
+    if user_has_any_leaves(db, target_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This employee has leave history and cannot be permanently deleted, "
+                "since that would destroy the audit trail. Set is_active to false "
+                "(deactivate) instead to revoke their access."
+            ),
         )
 
     delete_user(db, target_user)

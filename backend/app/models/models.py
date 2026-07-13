@@ -65,11 +65,17 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    # No delete-orphan cascade here on purpose: leave records are an audit
+    # trail (see Leave model / delete_leave()), so deleting a User must
+    # never silently cascade-delete their leave history. Employee deletion
+    # is only permitted (see employees.py::delete_employee) once we've
+    # explicitly confirmed no leave records exist for that user; if any
+    # exist, the route rejects the delete and directs HR to deactivate
+    # the account instead.
     leaves = relationship(
         "Leave",
         back_populates="employee",
         foreign_keys="Leave.employee_id",
-        cascade="all, delete-orphan",
     )
 
 
