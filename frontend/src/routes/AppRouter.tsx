@@ -4,6 +4,7 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { ActivatePage } from '@/pages/auth/ActivatePage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { VerifyEmailChangePage } from '@/pages/auth/VerifyEmailChangePage';
 import { RootRedirect } from './RootRedirect';
 import { NotFoundPage } from '@/pages/placeholders/NotFoundPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
@@ -26,6 +27,7 @@ export function AppRouter() {
         <Route path="activate/:token" element={<ActivatePage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password/:token" element={<ResetPasswordPage />} />
+        <Route path="verify-email-change/:token" element={<VerifyEmailChangePage />} />
         <Route
           element={
             <ProtectedRoute>
