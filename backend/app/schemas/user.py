@@ -45,6 +45,12 @@ class UserUpdate(BaseModel):
     joining_date: date | None = None
     is_active: bool | None = None
 
+    # Required (server-enforced) whenever a user changes their OWN password
+    # or email — step-up re-auth so a hijacked/stolen session cookie alone
+    # isn't enough to take over the account. Not required when HR edits
+    # someone else's record (an admin action, not a self-service one).
+    current_password: str | None = None
+
     @field_validator("profile_picture_url")
     @classmethod
     def validate_profile_picture_url(cls, v: str | None) -> str | None:
