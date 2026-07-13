@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.crud.users import get_or_create_leave_balance
-from app.models.models import Leave, LeaveStatus, LeaveType
+from app.models.models import Leave, LeaveBalance, LeaveStatus, LeaveType
 
 
 class InsufficientLeaveBalanceError(Exception):
@@ -91,45 +91,73 @@ def create_leave(db: Session, leave: Leave) -> Leave:
 
 
 def approve_leave(db: Session, leave: Leave, approver_id: int) -> Leave:
-    if leave.status != LeaveStatus.pending:
+    # Re-fetch the leave row WITH a lock before trusting its status. Without
+    # this, two concurrent approve calls (double-click, two HR tabs, two HR
+    # accounts) can both pass the `status == pending` check below using a
+    # stale in-memory copy, both deduct balance, and both commit — a classic
+    # check-then-act race that silently overdraws the balance the check
+    # right below is supposed to prevent.
+    locked_leave = (
+        db.query(Leave).filter(Leave.id == leave.id).with_for_update().one()
+    )
+
+    if locked_leave.status != LeaveStatus.pending:
         raise InvalidLeaveTransitionError(
-            f"Cannot approve a leave request that is already {leave.status.value}."
+            f"Cannot approve a leave request that is already {locked_leave.status.value}."
         )
 
-    balance_fields = LEAVE_TYPE_BALANCE_FIELDS.get(leave.leave_type)
+    balance_fields = LEAVE_TYPE_BALANCE_FIELDS.get(locked_leave.leave_type)
     if balance_fields is not None:
         total_field, used_field = balance_fields
-        balance = get_or_create_leave_balance(db, leave.employee_id)
-        duration = calculate_leave_duration(leave)
+
+        # Lock the employee's balance row too: two DIFFERENT pending leave
+        # requests for the same employee, approved concurrently, must not
+        # both read the same "remaining" value before either writes back.
+        balance = (
+            db.query(LeaveBalance)
+            .filter(LeaveBalance.user_id == locked_leave.employee_id)
+            .with_for_update()
+            .first()
+        )
+        if balance is None:
+            balance = get_or_create_leave_balance(db, locked_leave.employee_id)
+
+        duration = calculate_leave_duration(locked_leave)
         remaining = getattr(balance, total_field) - getattr(balance, used_field)
 
         if duration > remaining:
             raise InsufficientLeaveBalanceError(
-                f"Insufficient {leave.leave_type.value} leave balance: "
+                f"Insufficient {locked_leave.leave_type.value} leave balance: "
                 f"requested {duration} day(s), {remaining} day(s) remaining."
             )
 
         setattr(balance, used_field, getattr(balance, used_field) + duration)
         db.add(balance)
 
-    leave.status = LeaveStatus.approved
-    leave.approver_id = approver_id
+    locked_leave.status = LeaveStatus.approved
+    locked_leave.approver_id = approver_id
     db.commit()
-    db.refresh(leave)
-    return leave
+    db.refresh(locked_leave)
+    return locked_leave
 
 
 def reject_leave(db: Session, leave: Leave, approver_id: int) -> Leave:
-    if leave.status != LeaveStatus.pending:
+    # Same reasoning as approve_leave: lock before checking status so a
+    # concurrent approve/reject on the same leave can't both go through.
+    locked_leave = (
+        db.query(Leave).filter(Leave.id == leave.id).with_for_update().one()
+    )
+
+    if locked_leave.status != LeaveStatus.pending:
         raise InvalidLeaveTransitionError(
-            f"Cannot reject a leave request that is already {leave.status.value}."
+            f"Cannot reject a leave request that is already {locked_leave.status.value}."
         )
 
-    leave.status = LeaveStatus.rejected
-    leave.approver_id = approver_id
+    locked_leave.status = LeaveStatus.rejected
+    locked_leave.approver_id = approver_id
     db.commit()
-    db.refresh(leave)
-    return leave
+    db.refresh(locked_leave)
+    return locked_leave
 
 
 def delete_leave(db: Session, leave: Leave) -> None:

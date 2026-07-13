@@ -24,8 +24,9 @@ router = APIRouter(prefix="/leaves", tags=["Leaves"])
 
 
 def _ensure_leave_access(current_user: User, leave: Leave) -> None:
+    # 404, not 403 — see the identical note in employees.py::_ensure_employee_access.
     if not current_user.is_superuser and leave.employee_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave not found")
 
 
 @router.post("/", response_model=LeaveResponse, status_code=status.HTTP_201_CREATED)
@@ -36,6 +37,13 @@ def apply_leave(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Lock the employee's own user row for the duration of this transaction.
+    # Without this, two near-simultaneous submits (double-click, two tabs)
+    # can both read "no overlap" before either has inserted its row, and
+    # both get created — the check-then-insert is only safe if it's
+    # serialized against the same employee's other in-flight requests.
+    db.query(User).filter(User.id == current_user.id).with_for_update().one()
+
     if has_overlapping_leave(db, current_user.id, leave_in.start_date, leave_in.end_date):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
