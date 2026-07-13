@@ -1,6 +1,6 @@
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -51,8 +51,11 @@ def _set_auth_cookie(response: Response, token: str, max_age_seconds: int) -> No
 
 
 def _ensure_employee_access(current_user: User, target_user: User) -> None:
+    # 404, not 403: an employee probing other IDs should see the exact same
+    # response whether that ID belongs to someone else or doesn't exist at
+    # all. A distinguishable 403 would let them enumerate valid employee IDs.
     if not current_user.is_superuser and current_user.id != target_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
 
 
 @router.get("/", response_model=PaginatedUsers)
@@ -102,6 +105,7 @@ def read_employee(
 def invite_employee(
     request: Request,
     invite_in: EmployeeInvite,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: User = Depends(require_superuser),
 ):
@@ -125,7 +129,9 @@ def invite_employee(
     created = create_user(db, new_user)
 
     activation_link = f"{settings.FRONTEND_URL}/activate/{token}"
-    send_invite_email(to_email=created.email, full_name=created.full_name, activation_link=activation_link)
+    background_tasks.add_task(
+        send_invite_email, to_email=created.email, full_name=created.full_name, activation_link=activation_link
+    )
 
     return created
 
@@ -151,6 +157,7 @@ def update_employee(
     user_id: int,
     user_in: UserUpdate,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -216,7 +223,8 @@ def update_employee(
                 hours=settings.EMAIL_CHANGE_TOKEN_EXPIRE_HOURS
             )
             verify_link = f"{settings.FRONTEND_URL}/verify-email-change/{token}"
-            send_email_change_verification(
+            background_tasks.add_task(
+                send_email_change_verification,
                 to_email=new_email,
                 full_name=target_user.full_name,
                 verify_link=verify_link,

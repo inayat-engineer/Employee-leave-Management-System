@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -108,11 +108,20 @@ def accept_invite(request: Request, payload: AcceptInvite, response: Response, d
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
-def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     generic_response = {"detail": "If that email is registered, a password reset link has been sent."}
 
     user = db.query(User).filter(User.email == payload.email).first()
     if user is None or not user.is_active:
+        # Same response, same DB work either way, and the actual SMTP call
+        # (which was the real timing signal) never happens inline in
+        # EITHER branch anymore — see below. This keeps "email exists" from
+        # leaking through response latency.
         return generic_response
 
     token = generate_invite_token()
@@ -123,7 +132,12 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
     # The raw token only ever exists in the email link — the DB only ever
     # holds its hash (see hash_token docstring).
     reset_link = f"{settings.FRONTEND_URL}/reset-password/{token}"
-    send_password_reset_email(to_email=user.email, full_name=user.full_name, reset_link=reset_link)
+    # Send after the response goes out, not before: a slow/unreachable SMTP
+    # server must never make this endpoint hang or become a distinguishing
+    # timing signal between "email exists" and "email doesn't exist".
+    background_tasks.add_task(
+        send_password_reset_email, to_email=user.email, full_name=user.full_name, reset_link=reset_link
+    )
 
     return generic_response
 
