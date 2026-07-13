@@ -43,6 +43,20 @@ class User(Base):
     invite_token_expires_at = Column(DateTime, nullable=True)
     reset_token = Column(String(255), nullable=True, unique=True, index=True)
     reset_token_expires_at = Column(DateTime, nullable=True)
+
+    # Bumped on every password change/reset. Embedded in issued JWTs ("ver"
+    # claim) so bumping this instantly invalidates every previously issued
+    # session token, even though tokens are otherwise stateless.
+    token_version = Column(Integer, default=0, nullable=False)
+
+    # Self-service email changes go through verification before they take
+    # effect: `email` is only overwritten once the link sent to the *new*
+    # address is clicked, so a hijacked session can't silently take over
+    # the account's identity.
+    pending_email = Column(String(150), nullable=True)
+    email_change_token = Column(String(255), nullable=True, unique=True, index=True)
+    email_change_token_expires_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     leave_balance = relationship(

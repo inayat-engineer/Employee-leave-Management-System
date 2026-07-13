@@ -22,13 +22,18 @@ def get_current_user(token: str | None = Depends(cookie_scheme), db: Session = D
     try:
         payload = decode_access_token(token)
         email: str | None = payload.get("sub")
-        if email is None:
+        token_version = payload.get("ver")
+        if email is None or token_version is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     user = get_user_by_email(db, email)
     if user is None:
+        raise credentials_exception
+    if token_version != user.token_version:
+        # Token was issued before the last password change/reset — treat it
+        # as revoked even though it hasn't expired yet.
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(
