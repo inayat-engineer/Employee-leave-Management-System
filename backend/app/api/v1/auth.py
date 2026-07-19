@@ -117,15 +117,25 @@ def forgot_password(
     generic_response = {"detail": "If that email is registered, a password reset link has been sent."}
 
     user = db.query(User).filter(User.email == payload.email).first()
+
+    # Do the same CPU work (token generation + hashing) and the same shape
+    # of DB round-trip regardless of whether the user exists, so response
+    # latency doesn't leak "email exists" vs "email doesn't exist". The
+    # actual SMTP send always happens out-of-band via BackgroundTasks
+    # either way, so it was never the timing signal here — the token
+    # generation/hash/commit was, and previously only ran on one branch.
+    token = generate_invite_token()
+    hashed_token = hash_token(token)
+
     if user is None or not user.is_active:
-        # Same response, same DB work either way, and the actual SMTP call
-        # (which was the real timing signal) never happens inline in
-        # EITHER branch anymore — see below. This keeps "email exists" from
-        # leaking through response latency.
+        # Touch the DB with an equivalent write-shaped statement so this
+        # branch's timing matches the real-user branch below. Rolled back,
+        # never committed, no observable side effect.
+        db.query(User).filter(User.email == payload.email).first()
+        db.rollback()
         return generic_response
 
-    token = generate_invite_token()
-    user.reset_token = hash_token(token)
+    user.reset_token = hashed_token
     user.reset_token_expires_at = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
     db.commit()
 
