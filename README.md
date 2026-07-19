@@ -9,7 +9,7 @@
 
 A production-ready full-stack employee leave management system with enterprise-grade security, real-time balance tracking, and fully containerized deployment.
 
-> **⭐ Production Ready | 🔒 Security Hardened | 🚀 Scalable Architecture**
+> **⭐ | 🔒 Security Hardened | 🚀 Scalable Architecture**
 
 ---
 
