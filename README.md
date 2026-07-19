@@ -85,7 +85,6 @@ A production-ready full-stack employee leave management system with enterprise-g
 | TypeScript | 5.x | Type Safety |
 | Vite | 5.x | Build Tool |
 | Tailwind CSS | 3.x | Styling |
-| Zustand | 4.x | State Management |
 | React Hook Form | 7.x | Form Handling |
 | Zod | 3.x | Validation |
 | Axios | 1.x | HTTP Client |
@@ -109,9 +108,6 @@ A production-ready full-stack employee leave management system with enterprise-g
 | Docker Compose | Orchestration |
 | Nginx | Reverse Proxy |
 | MySQL 8.0 | Database |
-| Redis | Caching (optional) |
-| Prometheus | Monitoring |
-| Grafana | Visualization |
 
 ---
 
@@ -127,8 +123,7 @@ Browser ───────► ┌──────────────�
                                        │
                   ┌────────────────────▼─────────────────────┐
                   │   FastAPI Backend (Port 8000)              │
-                  │   - Service Layer (Business Logic)          │
-                  │   - Repository Layer (Data Access)          │
+                  │   - Route handlers (app/api/v1/*)           │
                   │   - Rate Limiting                          │
                   │   - JWT Auth                               │
                   └───────────────────┬─────────────────────┘
@@ -142,12 +137,10 @@ Browser ───────► ┌──────────────�
 ```
 
 **Key Architectural Decisions:**
-- ✅ **Service Layer Pattern** — Business logic separated from routes
-- ✅ **Repository Pattern** — Data access abstraction
-- ✅ **API Versioning** — `/api/v1/*` for future compatibility
+- ✅ **Versioned Codebase Layout** — routes organized under `app/api/v1/` for future API versioning (not yet reflected in the URL path itself)
 - ✅ **Global Exception Handling** — Consistent error responses
-- ✅ **Dependency Injection** — Decoupled, testable code
-- ✅ **Redis Cache** — Optional performance boost
+- ✅ **Dependency Injection** — Decoupled, testable code (FastAPI `Depends`)
+- ✅ **Alembic Migrations** — Schema changes tracked and versioned
 
 ---
 
@@ -161,29 +154,28 @@ Employee-leave-Management-System/
 │   │   │   ├── v1/                # API version 1 routes
 │   │   │   └── middleware/        # Custom middleware
 │   │   ├── core/
-│   │   │   ├── cache/             # Redis caching
 │   │   │   ├── config.py          # App configuration
 │   │   │   ├── exceptions.py      # Global exception handlers
 │   │   │   └── security.py        # Auth, JWT, password
 │   │   ├── models/                # SQLAlchemy models
-│   │   ├── repositories/          # Data access layer
-│   │   ├── schemas/               # Pydantic schemas
-│   │   ├── services/              # Business logic
-│   │   ├── tasks/                 # Background tasks
+│   │   ├── schemas/                # Pydantic schemas
+│   │   ├── tasks/                  # Background tasks
 │   │   └── main.py                # FastAPI app entry
 │   ├── alembic/                   # Database migrations
-│   ├── tests/                     # Unit & integration tests
+│   ├── tests/                     # Unit & integration tests (scaffolded, not yet written)
 │   ├── requirements.txt
+│   ├── entrypoint.sh              # Runs `alembic upgrade head` then starts uvicorn
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
 │   ├── src/
 │   │   ├── components/            # Reusable UI components
-│   │   ├── hooks/                 # Custom React hooks
+│   │   ├── context/                # AuthContext (auth state)
+│   │   ├── layouts/                # Page layout wrappers
 │   │   ├── pages/                 # Route pages
+│   │   ├── routes/                 # Route guards (ProtectedRoute, etc.)
 │   │   ├── services/              # API client
-│   │   ├── store/                 # Zustand state stores
-│   │   ├── types/                 # TypeScript types
+│   │   ├── styles/                 # Global styles
 │   │   └── utils/                 # Utilities & helpers
 │   ├── tests/                     # Frontend tests
 │   ├── package.json
@@ -191,14 +183,9 @@ Employee-leave-Management-System/
 ├── nginx/
 │   ├── nginx.conf
 │   └── Dockerfile
-├── monitoring/
-│   ├── prometheus/                # Metrics collection
-│   └── grafana/                   # Dashboards
 ├── scripts/
 │   ├── healthcheck.sh
 │   └── backup.sh
-├── .github/
-│   └── workflows/                 # CI/CD pipelines
 ├── docker-compose.yml
 └── README.md
 ```
@@ -225,12 +212,14 @@ MYSQL_DATABASE=leave_db
 MYSQL_USER=leave_user
 MYSQL_PASSWORD=change_this_db_password
 JWT_SECRET=change_this_secret_64_chars_minimum
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password_here
+SMTP_FROM_EMAIL=your_email@gmail.com
 BOOTSTRAP_SUPERUSER_EMAIL=admin@company.com
 BOOTSTRAP_SUPERUSER_PASSWORD=Admin@123
 BOOTSTRAP_SUPERUSER_FULL_NAME=System Administrator
 DEBUG=False
 ENABLE_DOCS=False
-REDIS_URL=redis://redis:6379/0
 EOF
 
 # 3. Build and start services
@@ -298,11 +287,6 @@ docker compose ps
 docker compose logs -f
 ```
 
-### Monitoring (Optional)
-
-- **Prometheus:** http://localhost:9090
-- **Grafana:** http://localhost:3000 (`admin` / `admin`)
-
 ---
 
 ## 🧪 Testing
@@ -347,23 +331,27 @@ When `ENABLE_DOCS=True` (in `.env`), access:
 
 ### Key Endpoints
 
+> Note: the `v1` in `app/api/v1/` is just the folder name — routes are **not**
+> actually prefixed with `/v1`. The public path (through nginx) is `/api/<router>/...`.
+
 ```http
-POST   /api/v1/auth/login            # Login
-POST   /api/v1/auth/logout           # Logout
-POST   /api/v1/auth/refresh          # Refresh token
-POST   /api/v1/auth/forgot-password  # Forgot password
+POST   /api/auth/login              # Login
+POST   /api/auth/logout             # Logout
+POST   /api/auth/forgot-password    # Forgot password
+POST   /api/auth/reset-password     # Reset password
+POST   /api/auth/accept-invite      # Accept invite
 
-GET    /api/v1/employees             # List employees (HR)
-GET    /api/v1/employees/me          # My profile
-GET    /api/v1/employees/{id}        # Get employee (HR)
+GET    /api/employees               # List employees (HR)
+GET    /api/employees/me            # My profile
+GET    /api/employees/{id}          # Get employee (HR)
 
-GET    /api/v1/leaves                # List leaves
-POST   /api/v1/leaves                # Apply for leave
-PUT    /api/v1/leaves/{id}/approve   # Approve leave (HR)
-PUT    /api/v1/leaves/{id}/reject    # Reject leave (HR)
+GET    /api/leaves                  # List leaves
+POST   /api/leaves                  # Apply for leave
+POST   /api/leaves/{id}/approve     # Approve leave (HR)
+POST   /api/leaves/{id}/reject      # Reject leave (HR)
 
-GET    /api/v1/dashboard             # Dashboard stats
-GET    /api/v1/notifications         # My notifications
+GET    /api/dashboard                # Dashboard stats
+GET    /api/notifications           # My notifications
 ```
 
 ---
@@ -447,13 +435,10 @@ npm run type-check
 ## 🌟 Roadmap
 
 - [x] Docker containerization
-- [x] Redis caching
-- [x] CI/CD pipeline
-- [x] Monitoring with Prometheus/Grafana
 - [x] Database migrations (Alembic)
-- [x] Service/Repository pattern
-- [x] State management (Zustand)
 - [x] API versioning
+- [ ] Automated test suite (scaffolded, no tests written yet)
+- [ ] CI/CD pipeline
 - [ ] HTTPS/SSL support
 - [ ] WebSocket real-time notifications
 - [ ] File upload for profile pictures
