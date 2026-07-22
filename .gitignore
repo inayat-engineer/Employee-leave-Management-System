@@ -21,3 +21,4 @@ frontend/.env
 # Root-level env (Docker Compose credentials)
 .env
 *cookies*.txt
+frontend/.env.development

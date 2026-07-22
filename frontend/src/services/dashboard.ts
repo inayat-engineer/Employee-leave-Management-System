@@ -7,14 +7,7 @@ export type DashboardStats = {
   leaves_rejected: number;
 };
 
-export type LeaveType =
-  | 'casual'
-  | 'sick'
-  | 'annual'
-  | 'wedding'
-  | 'family_emergency'
-  | 'personal'
-  | 'other';
+export type LeaveType = 'casual' | 'sick' | 'annual';
 
 export type LeaveRecord = {
   id: number;

@@ -2,23 +2,12 @@ import { api } from './api';
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected';
 
-export type LeaveType =
-  | 'casual'
-  | 'sick'
-  | 'annual'
-  | 'wedding'
-  | 'family_emergency'
-  | 'personal'
-  | 'other';
+export type LeaveType = 'casual' | 'sick' | 'annual';
 
 export const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {
   casual: 'Casual Leave',
   sick: 'Sick Leave',
   annual: 'Annual Leave',
-  wedding: 'Wedding',
-  family_emergency: 'Family Emergency',
-  personal: 'Personal Reasons',
-  other: 'Other',
 };
 
 export type LeaveRecord = {

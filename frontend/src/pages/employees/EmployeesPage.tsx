@@ -192,6 +192,7 @@ export function EmployeesPage() {
         designation: String(formData.get('designation') || '') || null,
         phone_number: String(formData.get('phone_number') || '') || null,
         joining_date: String(formData.get('joining_date') || '') || null,
+        ...(isEditingSelf ? {} : { is_active: formData.get('is_active') === 'on' }),
       });
       toast.success('Employee updated successfully');
       setEditTarget(null);
@@ -589,6 +590,22 @@ export function EmployeesPage() {
                 />
               </label>
             </div>
+
+            <label className="flex items-center justify-between rounded-xl border border-border bg-surface-soft/80 px-4 py-3">
+              <span className="text-sm font-medium text-text">
+                Active
+                {editTarget.id === user?.id ? (
+                  <span className="ml-2 text-xs font-normal text-text-muted">(you can't deactivate your own account)</span>
+                ) : null}
+              </span>
+              <input
+                name="is_active"
+                type="checkbox"
+                defaultChecked={editTarget.is_active}
+                disabled={editTarget.id === user?.id}
+                className="h-5 w-5 rounded border-border accent-accent disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="secondary" onClick={() => setEditTarget(null)} disabled={isSavingEdit}>

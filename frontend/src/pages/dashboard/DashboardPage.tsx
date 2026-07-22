@@ -33,10 +33,6 @@ const LEAVE_TYPE_COLORS: Record<LeaveType, string> = {
   casual: 'rgb(245 158 11)',
   sick: 'rgb(45 212 191)',
   annual: 'rgb(14 165 233)',
-  wedding: 'rgb(236 72 153)',
-  family_emergency: 'rgb(239 68 68)',
-  personal: 'rgb(168 85 247)',
-  other: 'rgb(148 163 184)',
 };
 
 function formatLeaveTypeLabel(leaveType: LeaveType): string {
@@ -79,10 +75,6 @@ function buildLeaveTypeSegments(leaves: LeaveRecord[]) {
     casual: 0,
     sick: 0,
     annual: 0,
-    wedding: 0,
-    family_emergency: 0,
-    personal: 0,
-    other: 0,
   };
 
   for (const leave of leaves) {

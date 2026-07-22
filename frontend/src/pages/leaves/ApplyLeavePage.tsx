@@ -52,7 +52,6 @@ function calculateDays(start: string, end: string) {
 // Groups the dropdown into logical sections for a cleaner UX
 const leaveTypeGroups: { label: string; types: LeaveType[] }[] = [
   { label: 'Standard leave', types: ['casual', 'sick', 'annual'] },
-  { label: 'Personal', types: ['wedding', 'family_emergency', 'personal', 'other'] },
 ];
 
 export function ApplyLeavePage() {

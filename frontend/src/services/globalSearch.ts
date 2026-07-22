@@ -36,10 +36,7 @@ const ALL_LEAVE_TYPES: LeaveRecord['leave_type'][] = [
   'casual',
   'sick',
   'annual',
-  'wedding',
-  'family_emergency',
-  'personal',
-  'other',
+  
 ];
 
 function findMatchingLeaveTypes(query: string): LeaveRecord['leave_type'][] {
